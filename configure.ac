@@ -163,6 +163,10 @@ AC_ARG_ENABLE(default-engine,
   [AS_HELP_STRING([--enable-default-engine], [Build-in default engine])])
 AM_CONDITIONAL([INCLUDE_DEFAULT_ENGINE],[test "$enable_default_engine" = "yes"])
 
+AC_ARG_ENABLE(bag-lru-engine,
+  [AS_HELP_STRING([--enable-bag-lru-engine], [Build-in bag lru engine])])
+AM_CONDITIONAL([INCLUDE_BAG_LRU_ENGINE],[test "$enable_bag_lru_engine" = "yes"])
+
 AC_ARG_ENABLE(dtrace,
   [AS_HELP_STRING([--enable-dtrace],[Enable dtrace probes])])
 if test "x$enable_dtrace" = "xyes"; then

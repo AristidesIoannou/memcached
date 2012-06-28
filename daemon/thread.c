@@ -17,6 +17,15 @@
 
 #define ITEMS_PER_ALLOC 64
 
+#define CPU_AFFINITY
+
+#if defined(CPU_AFFINITY)
+#include "cpu.h"
+static volatile int worker_cpu = 0;
+extern int threadPinInc;
+extern int numProcs;
+#endif
+
 static char devnull[8192];
 extern volatile sig_atomic_t memcached_shutdown;
 
@@ -297,6 +306,16 @@ static void *worker_libevent(void *arg) {
      */
 
     pthread_mutex_lock(&init_lock);
+#if defined(CPU_AFFINITY)
+    if (threadPinInc != 0)
+    {
+      int my_cpu = worker_cpu;
+      worker_cpu += threadPinInc;
+      if(my_cpu >= numProcs)
+        my_cpu %= (numProcs/2);
+      bind_thread_to_cpu(my_cpu);
+    }
+#endif
     init_count++;
     pthread_cond_signal(&init_cond);
     pthread_mutex_unlock(&init_lock);

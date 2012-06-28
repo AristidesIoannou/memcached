@@ -26,6 +26,7 @@ pkglib_LTLIBRARIES = libmemcached_utilities.la \
                      ascii_scrub.la \
                      basic_engine_testsuite.la \
                      default_engine.la \
+                     bag_lru_engine.la \
                      example_protocol.la \
                      fragment_rw_ops.la \
                      blackhole_logger.la \
@@ -149,6 +150,26 @@ default_engine_la_DEPENDENCIES= libmemcached_utilities.la
 default_engine_la_LIBADD= libmemcached_utilities.la $(LIBM)
 default_engine_la_LDFLAGS= -avoid-version -shared -module -no-undefined
 
+if INCLUDE_BAG_LRU_ENGINE
+memcached_SOURCES += $(bag_lru_engine_la_SOURCES)
+memcached_LDFLAGS += -export-dynamic
+endif
+
+# The default storage engine
+bag_lru_engine_la_SOURCES= engines/bag_lru_engine/assoc_bl.c \
+                           engines/bag_lru_engine/assoc_bl.h \
+                           engines/bag_lru_engine/default_engine_bl.c \
+                           engines/bag_lru_engine/default_engine_bl.h \
+                           engines/bag_lru_engine/items_bl.c \
+                           engines/bag_lru_engine/items_bl.h \
+                           engines/bag_lru_engine/slabs_bl.c \
+                           engines/bag_lru_engine/slabs_bl.h
+
+bag_lru_engine_la_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir)/engines/bag_lru_engine
+bag_lru_engine_la_DEPENDENCIES= libmemcached_utilities.la
+bag_lru_engine_la_LIBADD= libmemcached_utilities.la $(LIBM)
+bag_lru_engine_la_LDFLAGS= -avoid-version -shared -module -no-undefined
+
 if BUILD_DTRACE
 BUILT_SOURCES += memcached_dtrace.h
 CLEANFILES += memcached_dtrace.h
@@ -157,10 +178,13 @@ endif
 if DTRACE_INSTRUMENT_OBJ
 memcached_LDADD += memcached_dtrace.o
 memcached_DEPENDENCIES += memcached_dtrace.o
-CLEANFILES += memcached_dtrace.o default_engine_dtrace.lo
+CLEANFILES += memcached_dtrace.o default_engine_dtrace.lo bag_lru_engine_dtrace.lo
 
 default_engine_la_LIBADD += default_engine_dtrace.lo
 default_engine_la_DEPENDENCIES += default_engine_dtrace.lo
+
+bag_lru_engine_la_LIBADD += bag_lru_engine_dtrace.lo
+bag_lru_engine_la_DEPENDENCIES += bag_lru_engine_dtrace.lo
 endif
 
 # ASCII support for the scrub command
@@ -249,6 +273,11 @@ default_engine_dtrace.lo: $(default_engine_la_OBJECTS)
 	$(DTRACE) $(DTRACEFLAGS) -G -o .libs/default_engine_la-default_engine_dtrace.o -s ${srcdir}/memcached_dtrace.d $(DEFAULT_ENGINE_OBJS)
 	sed -e s,assoc,default_engine_dtrace,g default_engine_la-assoc.lo > default_engine_dtrace.lo
 
+BAG_LRU_ENGINE_OBJS=$(bag_lru_engine_la_OBJECTS:%lo=.libs/%o)
+bag_lru_engine_dtrace.lo: $(bag_lru_engine_la_OBJECTS)
+	$(DTRACE) $(DTRACEFLAGS) -G -o .libs/bag_lru_engine_la-bag_lru_engine_dtrace.o -s ${srcdir}/memcached_dtrace.d $(BAG_LRU_ENGINE_OBJS)
+	sed -e s,assoc,bag_lru_engine_dtrace,g bag_lru_engine_la-assoc.lo > bag_lru_engine_dtrace.lo
+
 DIST_DIRS = scripts
 EXTRA_DIST = doc scripts t memcached.spec memcached_dtrace.d m4/version.m4 \
              testsuite/breakdancer/engine_test.py testsuite/breakdancer/breakdancer.py \
@@ -261,10 +290,14 @@ TEST_TIMEOUT=30
 breakdancer_engine: engine_testapp breakdancer_testsuite.la
 	./engine_testapp -. -q -E .libs/default_engine.so -t $(TEST_TIMEOUT) \
 		-T .libs/breakdancer_testsuite.so
+	./engine_testapp -. -q -E .libs/bag_lru_engine.so -t $(TEST_TIMEOUT) \
+                -T .libs/breakdancer_testsuite.so
 
 test_engine: engine_testapp basic_engine_testsuite.la
 	./engine_testapp -E .libs/default_engine.so -t $(TEST_TIMEOUT) \
 		-T .libs/basic_engine_testsuite.so
+	./engine_testapp -E .libs/bag_lru_engine.so -t $(TEST_TIMEOUT) \
+                -T .libs/basic_engine_testsuite.so
 
 test: $(bin_PROGRAMS) $(noinst_PROGRAMS) $(pkglib_LTLIBRARIES) $(ENGINE_TESTS)
 	./sizes
