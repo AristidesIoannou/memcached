@@ -32,6 +32,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#define CPU_AFFINITY
+
 static inline void item_set_cas(const void *cookie, item *it, uint64_t cas) {
     settings.engine.v1->item_set_cas(settings.engine.v0, cookie, it, cas);
 }
@@ -157,6 +159,11 @@ static int add_msghdr(conn *c);
 struct stats stats;
 struct settings settings;
 static time_t process_started;     /* when the process was started */
+
+#if defined(CPU_AFFINITY)
+int threadPinInc=0;
+int numProcs=0;
+#endif
 
 /** file scope variables **/
 static conn *listen_conn = NULL;
@@ -6969,6 +6976,9 @@ int main (int argc, char **argv) {
           "f:"  /* factor? */
           "n:"  /* minimum space allocated for key+value+flags */
           "t:"  /* threads */
+#if defined(CPU_AFFINITY)
+          "T:"  /* thread pinning increment */
+#endif
           "D:"  /* prefix delimiter? */
           "L"   /* Large memory pages */
           "R:"  /* max requests per event */
@@ -7099,6 +7109,11 @@ int main (int argc, char **argv) {
                         " your machine or less.\n");
             }
             break;
+#if defined(CPU_AFFINITY)
+        case 'T':
+            threadPinInc = atoi(optarg);
+            break;
+#endif
         case 'D':
             settings.prefix_delimiter = optarg[0];
             settings.detail_enabled = 1;
@@ -7208,6 +7223,16 @@ int main (int argc, char **argv) {
             return 1;
         }
     }
+
+#if defined(CPU_AFFINITY)
+    numProcs = sysconf(_SC_NPROCESSORS_ONLN);
+    printf ("Number of CPUs: %d\n", numProcs);
+    printf ("Number of Memcached threads: %d\n", settings.num_threads+1);
+    if (threadPinInc != 0)
+      printf ("Memcached threads will be pinned starting at CPU 0, incrementing by %d\n", threadPinInc);
+    else
+      printf ("Memcached threads will not be pinned to any CPUs\n");
+#endif
 
     /*
      * Use one workerthread to serve each UDP port if the user specified
